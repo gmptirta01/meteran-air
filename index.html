@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Baca Meter Air</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meter Air">
+<style>
+  /* =====================================================================
+     Tema "Glacier" — glassmorphism: permukaan gelap, kaca buram, cahaya es.
+     ===================================================================== */
+  :root {
+    color-scheme: dark;
+    --bg0: #050b16; --bg1: #0a1830;
+    --glass: rgba(148, 197, 255, 0.07); --glass-2: rgba(148, 197, 255, 0.12);
+    --stroke: rgba(170, 215, 255, 0.16); --stroke-2: rgba(170, 215, 255, 0.30);
+    --text: #e7f2ff; --muted: #8fa5c2;
+    --ice: #7dd3fc; --ice-2: #a5f3fc; --primary: #38bdf8; --primary-2: #818cf8;
+    --ok: #4ade80; --warn: #fbbf24; --err: #f87171; --red: #fb7185;
+    --glow: 0 0 0 1px rgba(125, 211, 252, .25), 0 0 24px rgba(56, 189, 248, .28);
+    --radius: 18px; --sidebar: 256px;
+  }
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text);
+    background:
+      radial-gradient(900px 600px at 10% -10%, rgba(56, 189, 248, .22), transparent 60%),
+      radial-gradient(700px 500px at 110% 10%, rgba(129, 140, 248, .20), transparent 60%),
+      radial-gradient(800px 600px at 50% 120%, rgba(45, 212, 191, .14), transparent 60%),
+      linear-gradient(180deg, var(--bg1), var(--bg0));
+    background-attachment: fixed;
+  }
+  .glass {
+    background: var(--glass); border: 1px solid var(--stroke); border-radius: var(--radius);
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .06);
+  }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); font-size: 13px; }
+  a { color: var(--ice); }
+
+  /* ---------- Login ---------- */
+  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+  .login-card { width: 100%; max-width: 380px; padding: 28px 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: .3px; }
+  .brand .logo { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 20px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, .35), rgba(129, 140, 248, .35)); box-shadow: var(--glow); }
+  .brand small { display: block; font-weight: 500; font-size: 13px; color: var(--muted); letter-spacing: .5px; }
+  .login-card h2 { margin: 22px 0 4px; font-size: 22px; }
+  details.server { margin-top: 12px; color: var(--muted); font-size: 13px; }
+  details.server summary { cursor: pointer; }
+
+  /* ---------- Form ---------- */
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+  input[type=text], input[type=url], input[type=password], input[type=number], input[type=email], input[type=tel],
+  input[type=search], select, textarea {
+    width: 100%; padding: 12px 14px; font-size: 16px; color: var(--text); font-family: inherit;
+    background: rgba(5, 12, 26, .55); border: 1px solid var(--stroke); border-radius: 12px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { min-height: 70px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { border-color: var(--ice); box-shadow: var(--glow); }
+  input[readonly] { opacity: .8; }
+  select option { background: #0b1830; }
+  input[type=range] { width: 100%; accent-color: var(--primary); }
+  input[type=checkbox] { accent-color: var(--primary); }
+  .pw, .kbd { position: relative; }
+  .kbd input { padding-right: 64px; }
+  .kbd-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-width: 50px; height: 36px; padding: 0 8px;
+    border: 1px solid var(--stroke); border-radius: 10px; background: var(--glass-2); color: var(--ice); font: 600 13px system-ui, sans-serif; cursor: pointer; }
+  .kbd-toggle:focus-visible { outline: none; box-shadow: var(--glow); }
+  .id-tools { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .id-tools .muted { flex: 1; font-size: 12px; }
+  .id-tools .btn { flex: 0 0 auto; }
+  #idSource.qr { color: var(--ok); font-weight: 600; }
+  #customerId.from-qr { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(74, 222, 128, .45); }
+  .pw input { padding-right: 52px; }
+  .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 40px; height: 36px;
+    border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .pw-toggle:hover, .pw-toggle:focus-visible { color: var(--ice); background: var(--glass-2); outline: none; }
+  .row { display: flex; gap: 10px; align-items: end; }
+  .row > * { flex: 1; min-width: 0; }
+
+  .btn { display: block; width: 100%; padding: 13px 14px; font-size: 16px; font-weight: 600; border-radius: 12px;
+    margin-top: 12px; cursor: pointer; color: var(--text); border: 1px solid var(--stroke); background: var(--glass-2);
+    transition: transform .08s, box-shadow .15s, background .15s; }
+  .btn:hover { box-shadow: var(--glow); }
+  .btn:active { transform: scale(.985); }
+  .btn-primary { border: 0; color: #04121f; background: linear-gradient(135deg, var(--ice-2), var(--primary) 55%, var(--primary-2));
+    box-shadow: 0 6px 24px rgba(56, 189, 248, .35); }
+  .btn-ok { border: 0; color: #03200f; background: linear-gradient(135deg, #86efac, var(--ok)); box-shadow: 0 6px 24px rgba(74, 222, 128, .28); }
+  .btn-warn { border: 0; color: #2a1800; background: linear-gradient(135deg, #fde68a, var(--warn)); }
+  .btn-danger { border: 1px solid rgba(248, 113, 113, .45); color: #fecaca; background: rgba(248, 113, 113, .12); }
+  .btn-ghost { background: var(--glass); }
+  .btn-sm { padding: 10px; font-size: 14px; margin-top: 8px; }
+  .btn-inline { display: inline-flex; width: auto; align-items: center; gap: 6px; margin: 0; padding: 9px 14px; font-size: 14px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+  .msg { padding: 10px 12px; border-radius: 12px; margin-top: 10px; font-size: 14px; border: 1px solid; }
+  .msg.err { background: rgba(248, 113, 113, .12); color: #fecaca; border-color: rgba(248, 113, 113, .35); }
+  .msg.warn { background: rgba(251, 191, 36, .12); color: #fde68a; border-color: rgba(251, 191, 36, .35); }
+  .msg.ok { background: rgba(74, 222, 128, .12); color: #bbf7d0; border-color: rgba(74, 222, 128, .35); }
+  .msg:not(.err):not(.warn):not(.ok) { background: var(--glass); border-color: var(--stroke); }
+
+  /* ---------- Shell: sidebar + konten ---------- */
+  .sidebar { position: fixed; z-index: 30; top: 12px; bottom: 12px; left: 12px; width: var(--sidebar);
+    display: flex; flex-direction: column; padding: 18px 14px; transition: transform .25s ease; }
+  .sidebar .brand { padding: 4px 6px 18px; border-bottom: 1px solid var(--stroke); }
+  .nav { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .nav a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; color: var(--text);
+    text-decoration: none; font-weight: 500; border: 1px solid transparent; transition: background .15s, box-shadow .15s; }
+  .nav a .ic { width: 22px; text-align: center; }
+  .nav a:hover { background: var(--glass); }
+  .nav a.active { background: linear-gradient(135deg, rgba(56, 189, 248, .22), rgba(129, 140, 248, .18));
+    border-color: var(--stroke-2); box-shadow: var(--glow); }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--stroke); padding-top: 14px; }
+  .who { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+    background: linear-gradient(135deg, rgba(125, 211, 252, .35), rgba(129, 140, 248, .35)); box-shadow: var(--glow); flex: 0 0 auto; }
+  .who b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--stroke-2);
+    color: var(--ice); background: rgba(56, 189, 248, .10); text-transform: capitalize; }
+  .chip.admin { color: #c7d2fe; border-color: rgba(129, 140, 248, .5); background: rgba(129, 140, 248, .14); }
+  .chip.pelanggan { color: #99f6e4; border-color: rgba(45, 212, 191, .5); background: rgba(45, 212, 191, .12); }
+  .chip.off { color: #fecaca; border-color: rgba(248, 113, 113, .5); background: rgba(248, 113, 113, .12); }
+  .scrim { position: fixed; inset: 0; z-index: 25; background: rgba(2, 6, 14, .55); backdrop-filter: blur(2px); }
+
+  .content { margin-left: calc(var(--sidebar) + 24px); min-height: 100vh; }
+  .topbar { position: sticky; top: 12px; z-index: 20; margin: 12px 12px 0 0; padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px; }
+  .topbar h1 { font-size: 17px; margin: 0; flex: 1; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--stroke); background: var(--glass);
+    color: var(--text); font-size: 18px; cursor: pointer; }
+  #btnMenu { display: none; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 12px 40px; }
+  .view { animation: fade .2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  @media (max-width: 899px) {
+    .sidebar { transform: translateX(calc(-100% - 24px)); }
+    .sidebar.open { transform: none; }
+    .content { margin-left: 0; }
+    .topbar { margin: 12px 12px 0; }
+    #btnMenu { display: inline-block; }
+  }
+
+  /* ---------- Kartu ---------- */
+  .card { padding: 18px 16px; margin-bottom: 14px; }
+  .card > strong:first-child, .card-title { display: block; font-size: 15px; letter-spacing: .2px; margin-bottom: 2px; }
+  .netbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 9px 14px; margin: 10px 12px 0;
+    font-size: 13px; border-radius: 12px; background: rgba(251, 191, 36, .12); color: #fde68a; border: 1px solid rgba(251, 191, 36, .35); }
+  .netbar.online { background: rgba(56, 189, 248, .12); color: #bae6fd; border-color: rgba(56, 189, 248, .35); }
+  .netbar button { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 10px; padding: 4px 10px; font-size: 13px; white-space: nowrap; }
+  .updbar { background: rgba(74, 222, 128, .12); color: #bbf7d0; border-color: rgba(74, 222, 128, .35); }
+  @media (min-width: 900px) { .netbar { margin: 10px 12px 0 0; } }
+
+  /* ---------- Catat meter ---------- */
+  .cust-info { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(45, 212, 191, .10);
+    border: 1px solid rgba(45, 212, 191, .30); color: #ccfbf1; font-size: 14px; }
+  #editor { width: 100%; border-radius: 12px; margin-top: 12px; touch-action: none; background: #000; display: block; border: 1px solid var(--stroke); }
+  #debug { width: 100%; image-rendering: pixelated; border-radius: 10px; background: #000; margin-top: 8px; }
+  .tiles { display: flex; gap: 4px; margin-top: 10px; }
+  .tile { flex: 1 1 0; min-width: 0; border: 2px solid var(--stroke); border-radius: 10px; padding: 3px 2px; text-align: center;
+    background: rgba(5, 12, 26, .5); cursor: pointer; }
+  .tile canvas { width: 100%; max-width: 40px; image-rendering: pixelated; border-radius: 4px; }
+  .tile .d { font: 700 22px ui-monospace, Menlo, monospace; }
+  .tile .c { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .tile.ok { border-color: rgba(74, 222, 128, .6); }
+  .tile.warn { border-color: rgba(251, 191, 36, .7); background: rgba(251, 191, 36, .10); }
+  .tile.err { border-color: rgba(248, 113, 113, .7); background: rgba(248, 113, 113, .10); }
+  .tile.sel { outline: 3px solid var(--ice); box-shadow: var(--glow); }
+  .tile.fixed .d { color: var(--ice); }
+  .tile.dec .d { color: var(--red); } .tile.dec.fixed .d { color: #fda4af; text-decoration: underline; }
+  .tile-sep { align-self: flex-end; font: 700 30px ui-monospace, Menlo, monospace; color: var(--red); padding: 0 2px; }
+  .picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px; }
+  .picker button { padding: 12px 0; font: 700 20px ui-monospace, Menlo, monospace; border: 1px solid var(--stroke);
+    border-radius: 10px; background: var(--glass-2); color: var(--text); }
+  .reading { font-family: ui-monospace, Menlo, monospace; font-size: 38px; letter-spacing: 4px; text-align: center;
+    background: rgba(2, 6, 14, .75); color: var(--ice-2); border: 1px solid var(--stroke-2); border-radius: 14px;
+    padding: 10px; margin: 12px 0 0; text-shadow: 0 0 18px rgba(125, 211, 252, .55); }
+  .doubt { border: 1px solid rgba(251, 191, 36, .55); background: rgba(251, 191, 36, .10); color: #fde68a; border-radius: 14px; padding: 12px; margin-top: 12px; }
+  .doubt.resolved { border-color: rgba(74, 222, 128, .5); background: rgba(74, 222, 128, .10); color: #bbf7d0; }
+  .doubt b { display: block; margin-bottom: 4px; }
+  .doubt ul { margin: 4px 0 8px; padding-left: 18px; font-size: 14px; }
+  .doubt label { display: flex; gap: 8px; align-items: flex-start; color: inherit; font-size: 14px; margin-top: 8px; }
+  .doubt label input { margin-top: 3px; width: 18px; height: 18px; flex: 0 0 auto; }
+  #finalReading.manual, #finalDecimal.manual { border-color: var(--warn); box-shadow: 0 0 0 1px rgba(251, 191, 36, .4); }
+  ul.tips { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  table.stats { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; text-align: center; }
+  table.stats td, table.stats th { border: 1px solid var(--stroke); padding: 4px; }
+  hr.sep { border: 0; border-top: 1px solid var(--stroke); margin: 16px 0; }
+  progress { accent-color: var(--primary); }
+
+  /* ---------- Pengguna ---------- */
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar input[type=search] { flex: 1 1 180px; }
+  .toolbar select { flex: 0 0 150px; width: 150px; }
+  .stats-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .stat { flex: 1 1 90px; padding: 10px 12px; border-radius: 14px; background: var(--glass); border: 1px solid var(--stroke); }
+  .stat b { display: block; font-size: 22px; color: var(--ice-2); }
+  .user-list { display: grid; gap: 10px; margin-top: 14px; }
+  .user-item { padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
+  .user-item .meta { flex: 1; min-width: 0; }
+  .user-item .meta b { font-size: 15px; }
+  .user-item .meta div { color: var(--muted); font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
+  .user-item .acts { display: flex; flex-direction: column; gap: 6px; }
+  .user-item .acts button { min-width: 74px; }
+
+  dialog { width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 0; color: var(--text);
+    background: rgba(10, 22, 44, .82); border: 1px solid var(--stroke-2); border-radius: 20px;
+    backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 24px 80px rgba(0, 0, 0, .6), var(--glow); }
+  dialog::backdrop { background: rgba(2, 6, 14, .6); backdrop-filter: blur(3px); }
+  dialog form { padding: 20px 18px; }
+  dialog h3 { margin: 0 0 4px; font-size: 18px; }
+  .dlg-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .dlg-actions .btn { margin-top: 0; }
+  .switch { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 14px; }
+  .switch input { width: 20px; height: 20px; }
+
+  /* scan QR langsung (viewfinder) */
+  .qr-wrap { padding: 16px; }
+  .qr-view { position: relative; width: 100%; aspect-ratio: 3 / 4; max-height: 60vh; margin-top: 10px;
+    overflow: hidden; border-radius: 16px; background: #000; }
+  .qr-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .qr-frame { --c: var(--ok); --l: 28px; --t: 4px; position: absolute; left: 50%; top: 50%; width: min(64%, 40vh);
+    aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 6px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .45);
+    background:
+      linear-gradient(var(--c), var(--c)) left top / var(--l) var(--t) no-repeat,
+      linear-gradient(var(--c), var(--c)) left top / var(--t) var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) right top / var(--l) var(--t) no-repeat,
+      linear-gradient(var(--c), var(--c)) right top / var(--t) var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--t) no-repeat,
+      linear-gradient(var(--c), var(--c)) left bottom / var(--t) var(--l) no-repeat,
+      linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--t) no-repeat,
+      linear-gradient(var(--c), var(--c)) right bottom / var(--t) var(--l) no-repeat; }
+  .qr-frame i { position: absolute; left: 8%; right: 8%; height: 2px; background: var(--ok); box-shadow: 0 0 12px var(--ok);
+    animation: qrline 1.8s ease-in-out infinite alternate; }
+  .qr-view.idle .qr-frame i { display: none; }
+  @keyframes qrline { from { top: 8%; } to { top: 92%; } }
+  #qrStatus { min-height: 2.6em; margin: 10px 0 0; font-size: 14px; }
+  .qr-wrap .dlg-actions { flex-wrap: wrap; }
+  #qrTorch.on { border-color: var(--warn); color: var(--warn); }
+</style>
+</head>
+<body>
+
+<!-- =================================================================== LOGIN -->
+<div id="loginView" class="login-wrap hidden">
+  <form id="loginForm" class="glass login-card" autocomplete="on" novalidate>
+    <div class="brand"><span class="logo">💧</span><span>Meter Air<small>GMP Tirta</small></span></div>
+    <h2>Masuk</h2>
+    <p class="muted" id="loginNote">Gunakan akun yang dibuat oleh admin.</p>
+    <label for="loginUser">Username</label>
+    <input id="loginUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    <label for="loginPass">Password</label>
+    <div class="pw">
+      <input id="loginPass" type="password" autocomplete="current-password" required>
+      <button type="button" class="pw-toggle" data-pw="loginPass" aria-label="Tampilkan password" aria-pressed="false">👁</button>
+    </div>
+    <details class="server" id="serverBox">
+      <summary>Server</summary>
+      <label for="cfgUrl">URL Web App Apps Script</label>
+      <input id="cfgUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    </details>
+    <button class="btn btn-primary" id="btnLogin" type="submit">Masuk</button>
+    <div id="loginMsg"></div>
+    <p class="muted" style="text-align:center;margin-bottom:0">Lupa password? Hubungi admin.</p>
+  </form>
+</div>
+
+<!-- =================================================================== APLIKASI -->
+<div id="shell" class="hidden">
+  <aside id="sidebar" class="sidebar glass" aria-label="Menu utama">
+    <div class="brand"><span class="logo">💧</span><span>Meter Air<small>GMP Tirta</small></span></div>
+    <nav class="nav" id="nav">
+      <!-- data-roles: menu tampil hanya untuk peran ini (server tetap memeriksa setiap aksi) -->
+      <a href="#meter" data-view="meter" data-roles="admin,operator,pelanggan"><span class="ic">📷</span>Catat Meter</a>
+      <a href="#users" data-view="users" data-roles="admin"><span class="ic">👥</span>Pengguna</a>
+      <a href="#settings" data-view="settings" data-roles="admin"><span class="ic">⚙️</span>Pengaturan</a>
+    </nav>
+    <div class="side-foot">
+      <div class="who">
+        <div class="avatar" id="whoAvatar">?</div>
+        <div style="min-width:0"><b id="whoName"></b><span class="chip" id="whoRole"></span></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnChangePw" type="button">🔑 Ganti Password</button>
+      <button class="btn btn-danger btn-sm" id="btnLogout" type="button">⏻ Keluar</button>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim hidden"></div>
+
+  <div class="content">
+    <header class="topbar glass">
+      <button class="icon-btn" id="btnMenu" type="button" aria-label="Buka menu" aria-controls="sidebar">☰</button>
+      <h1 id="viewTitle">Catat Meter</h1>
+      <span class="chip" id="topRole"></span>
+    </header>
+    <div id="netbar" class="netbar hidden">
+      <span id="netText"></span>
+      <button id="btnSync" type="button">Kirim sekarang</button>
+    </div>
+    <div id="updbar" class="netbar updbar hidden">
+      <span>Versi baru aplikasi tersedia.</span>
+      <button id="btnUpdate" type="button">Muat ulang</button>
+    </div>
+
+    <main>
+      <!-- ============================================ CATAT METER -->
+      <div id="view-meter" class="view">
+        <section class="card glass">
+          <strong>1. Data & Foto Meter</strong>
+          <label for="customerId">ID Meter / No. Sambungan</label>
+          <!-- Keyboard standar (huruf + angka) secara bawaan; tombol 123/ABC beralih ke keypad angka -->
+          <div class="kbd">
+            <input id="customerId" type="text" inputmode="text" placeholder="mis. 0012345" autocomplete="off"
+              autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="32">
+            <button type="button" class="kbd-toggle" id="btnKbd" aria-label="Ganti ke keypad angka" title="Ganti keyboard">123</button>
+          </div>
+          <!-- ID dari stiker QR (dibuat aplikasi lain, isi = ID numerik): scan stikernya, atau otomatis dari foto meter -->
+          <div class="id-tools">
+            <span id="idSource" class="muted">Scan stiker QR, atau ID terbaca otomatis bila stikernya ikut terfoto. Ketik manual tetap bisa.</span>
+            <button class="btn btn-ghost btn-inline" id="btnScanQr" type="button">📷 Scan QR</button>
+            <button class="btn btn-ghost btn-inline hidden" id="btnIdManual" type="button">✏️ Ubah manual</button>
+          </div>
+          <input id="qrFile" type="file" accept="image/*" capture="environment" class="hidden">
+          <div id="customerInfo" class="cust-info hidden"></div>
+          <input id="file" type="file" accept="image/*" capture="environment" class="hidden">
+          <button class="btn btn-primary" id="btnPhoto" type="button">📷 Ambil Foto Meter</button>
+          <button class="btn btn-ghost btn-sm" id="btnManualNoPhoto" type="button" disabled>⌨️ Input Manual (bila OCR gagal)</button>
+          <p class="muted" id="manualHint" style="margin:6px 0 0;text-align:center">Input manual aktif setelah foto meter diambil.</p>
+          <ul class="tips">
+            <li>Foto tegak lurus dan dekat, angka memenuhi ± ½ lebar layar.</li>
+            <li>Hindari pantulan cahaya/flash dan bayangan di kaca. Lap kaca bila berembun.</li>
+          </ul>
+        </section>
+
+        <section class="card glass hidden" id="cropCard">
+          <strong>2. Area Angka</strong>
+          <p class="muted">Area angka dideteksi <b>otomatis</b> (kotak kuning = m³, kotak pink = desimal). Bila meleset,
+            seret kotak baru mengelilingi <b>angka hitam (m³)</b> saja; garis biru = pembagian tiap digit.
+            Sentuh di dalam kotak untuk menggeser.</p>
+          <canvas id="editor"></canvas>
+          <div class="row">
+            <div>
+              <label for="angle">Putar: <span id="angleVal">0°</span></label>
+              <input id="angle" type="range" min="-180" max="180" step="0.5" value="0">
+            </div>
+            <div style="flex:0 0 110px">
+              <label for="nDigits">Jumlah digit</label>
+              <input id="nDigits" type="number" min="3" max="8" value="5">
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost" id="btnDetect" type="button">🎯 Deteksi Ulang</button>
+            <button class="btn btn-primary" id="btnRead" type="button">🔍 Baca Angka</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btnManualFromCrop" type="button">⌨️ Area tidak terbaca? Input Manual</button>
+          <div id="readMsg"></div>
+        </section>
+
+        <section class="card glass hidden" id="resultCard">
+          <strong id="resultTitle">3. Hasil Pembacaan</strong>
+          <div id="ocrBlock">
+            <canvas id="debug"></canvas>
+            <p class="muted">Kotak hijau = yakin · merah = ragu · oranye = roda sedang berputar · 📅 = disesuaikan dengan pembacaan bulan lalu. Ketuk digit (termasuk desimal merah) untuk mengoreksi — koreksi dipelajari saat disimpan.</p>
+            <div class="tiles" id="tiles"></div>
+            <div class="picker hidden" id="picker"></div>
+          </div>
+          <div id="manualRow" class="hidden">
+            <p class="muted">Baca angka langsung dari meter, lalu ketik di kolom bawah. Angka hitam = m³, angka merah = desimal (opsional).</p>
+            <label for="manualReason">Alasan input manual</label>
+            <select id="manualReason">
+              <option value="">— pilih alasan —</option>
+              <option>Kaca meter buram / berembun / kotor</option>
+              <option>Angka tertutup silau / bayangan</option>
+              <option>Area angka tidak terdeteksi</option>
+              <option>Hasil OCR salah / meragukan</option>
+              <option>Kamera / foto bermasalah</option>
+              <option>Meter rusak / tidak terbaca</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+          <div class="reading" id="readingDisplay"></div>
+          <div id="compareMsg"></div>
+          <div id="doubtBox" class="doubt hidden">
+            <b id="doubtTitle">⚠️ Hasil OCR meragukan — cocokkan dengan meter</b>
+            <ul id="doubtList"></ul>
+            <button class="btn btn-warn btn-sm" id="btnTypeManual" type="button">⌨️ Ketik Angka Manual</button>
+            <label><input id="confirmOk" type="checkbox"> Saya sudah mencocokkan langsung dengan meter dan angka di bawah sudah benar.</label>
+          </div>
+          <div class="row">
+            <div>
+              <label for="finalReading">Angka Final (m³)</label>
+              <input id="finalReading" type="text" inputmode="numeric" pattern="[0-9]*">
+            </div>
+            <div id="decRow" class="hidden" style="flex:0 0 38%">
+              <label for="finalDecimal" style="color:var(--red)">Desimal (merah)</label>
+              <input id="finalDecimal" type="text" inputmode="numeric" pattern="[0-9]*" style="color:var(--red)" placeholder="opsional">
+            </div>
+          </div>
+          <button class="btn btn-ok" id="btnSave" type="button">💾 Simpan ke Google Sheet</button>
+          <button class="btn btn-ghost" id="btnReset" type="button">Meter Berikutnya</button>
+          <div id="saveMsg"></div>
+        </section>
+
+        <p class="muted" style="text-align:center">OCR berjalan di HP ini. Foto tidak dikirim ke mana pun.<br>
+          Bisa dipakai offline — data disimpan di antrean dan dikirim otomatis saat online.</p>
+      </div>
+
+      <!-- ============================================ PENGGUNA (admin) -->
+      <div id="view-users" class="view hidden">
+        <section class="card glass">
+          <div class="toolbar">
+            <input id="userSearch" type="search" placeholder="Cari nama, username, ID meter, alamat…" aria-label="Cari pengguna">
+            <select id="userRoleFilter" aria-label="Filter peran">
+              <option value="">Semua peran</option>
+              <option value="admin">Admin</option>
+              <option value="operator">Operator</option>
+              <option value="pelanggan">Pelanggan</option>
+            </select>
+          </div>
+          <div class="stats-row" id="userStats"></div>
+          <div class="row">
+            <button class="btn btn-primary" id="btnAddOperator" type="button">＋ Operator</button>
+            <button class="btn btn-primary" id="btnAddPelanggan" type="button">＋ Pelanggan</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btnReloadUsers" type="button">⟳ Muat ulang</button>
+          <div id="usersMsg"></div>
+        </section>
+        <div class="user-list" id="userList"></div>
+      </div>
+
+      <!-- ============================================ PENGATURAN (admin) -->
+      <div id="view-settings" class="view hidden">
+        <section class="card glass">
+          <strong>Server</strong>
+          <p class="muted" id="serverInfo"></p>
+          <div id="serverUrlRow">
+            <label for="cfgUrl2">URL Web App Apps Script</label>
+            <input id="cfgUrl2" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+            <button class="btn btn-primary btn-sm" id="btnSaveUrl" type="button">Simpan URL</button>
+          </div>
+          <div id="settingsMsg"></div>
+        </section>
+
+        <section class="card glass" id="exportCard">
+          <strong>📊 Ekspor Data Pembacaan ke Excel</strong>
+          <p class="muted">Pilih bulan (menurut tanggal baca di lapangan). File <b>.xlsx</b> berisi sheet <b>Pembacaan</b>
+            (semua data bulan itu + nama &amp; alamat pelanggan) dan <b>Ringkasan</b> pemakaian per pelanggan. Khusus admin.</p>
+          <label for="expMonth">Bulan</label>
+          <select id="expMonth"><option value="">Memuat daftar bulan…</option></select>
+          <button class="btn btn-primary" id="btnExportXlsx" type="button">⬇️ Unduh Excel</button>
+          <div id="exportMsg"></div>
+        </section>
+
+        <section id="modelCard" class="card glass">
+          <strong>Model OCR (di perangkat ini)</strong>
+          <p class="muted">Model belajar dari setiap pembacaan yang disimpan. Makin banyak sampel nyata, makin akurat.
+            Bagikan model ke HP petugas lain lewat Ekspor/Impor.</p>
+          <div id="modelStats"></div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" id="btnExport" type="button">⬇️ Ekspor</button>
+            <button class="btn btn-ghost btn-sm" id="btnImport" type="button">⬆️ Impor</button>
+            <button class="btn btn-ghost btn-sm" id="btnResetModel" type="button">🗑️ Reset</button>
+          </div>
+          <input id="importFile" type="file" accept="application/json,.json" class="hidden">
+          <div id="modelMsg"></div>
+
+          <hr class="sep">
+          <strong>🧠 CNN (TensorFlow.js)</strong>
+          <p class="muted">Jaringan saraf konvolusi kecil yang dilatih di HP ini dari sampel di atas (dengan augmentasi).
+            Hasilnya digabung dengan k-NN. Latih ulang setelah ada banyak koreksi baru.</p>
+          <div id="cnnStatus" class="muted"></div>
+          <label class="switch"><input id="cnnUse" type="checkbox" checked> Gunakan CNN saat membaca</label>
+          <progress id="cnnProgress" class="hidden" max="1" value="0" style="width:100%;margin-top:8px"></progress>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" id="btnTrainCnn" type="button">🧠 Latih CNN</button>
+            <button class="btn btn-ghost btn-sm" id="btnExportCnn" type="button">⬇️ Ekspor</button>
+            <button class="btn btn-ghost btn-sm" id="btnImportCnn" type="button">⬆️ Impor</button>
+            <button class="btn btn-ghost btn-sm" id="btnResetCnn" type="button" aria-label="Reset CNN">🗑️</button>
+          </div>
+          <input id="importCnn" type="file" accept=".json,.bin" multiple class="hidden">
+          <div id="cnnMsg"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- =================================================================== DIALOG -->
+<dialog id="userDialog">
+  <form id="userForm" method="dialog" novalidate>
+    <h3 id="userDlgTitle">Tambah Pengguna</h3>
+    <p class="muted" id="userDlgNote"></p>
+    <label for="uRole">Peran</label>
+    <select id="uRole">
+      <option value="operator">Operator</option>
+      <option value="pelanggan">Pelanggan</option>
+    </select>
+    <div id="uPelangganFields">
+      <label for="uMeter">ID Pelanggan / ID Meter * <span class="muted" id="uMeterNote"></span></label>
+      <input id="uMeter" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="32">
+    </div>
+    <label for="uNama">Nama *</label>
+    <input id="uNama" type="text" autocomplete="off" maxlength="80">
+    <div id="uPelangganFields2">
+      <label for="uAlamat">Alamat *</label>
+      <textarea id="uAlamat" maxlength="200"></textarea>
+      <div class="row">
+        <div><label for="uEmail">Email (opsional)</label><input id="uEmail" type="email" autocomplete="off"></div>
+        <div><label for="uHp">No HP (opsional)</label><input id="uHp" type="tel" inputmode="tel" autocomplete="off"></div>
+      </div>
+    </div>
+    <label class="switch hidden" id="uAkunRow" style="margin-top:14px"><input id="uAkun" type="checkbox" checked> Punya akun login (pelanggan bisa mencatat meternya sendiri)</label>
+    <div id="uLoginFields">
+      <label for="uUsername">Username (untuk login) *</label>
+      <input id="uUsername" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" maxlength="32">
+      <label for="uPass" id="uPassLabel">Password *</label>
+      <div class="pw">
+        <input id="uPass" type="password" autocomplete="new-password">
+        <button type="button" class="pw-toggle" data-pw="uPass" aria-label="Tampilkan password" aria-pressed="false">👁</button>
+      </div>
+    </div>
+    <label class="switch" id="uAktifRow" style="margin-top:12px"><input id="uAktif" type="checkbox" checked> <span id="uAktifText">Akun aktif (bisa login)</span></label>
+    <div id="userDlgMsg"></div>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="btnUserCancel" type="button">Batal</button>
+      <button class="btn btn-primary" id="btnUserSave" type="submit">Simpan</button>
+    </div>
+    <button class="btn btn-danger btn-sm hidden" id="btnUserDelete" type="button">🗑️ Hapus Pengguna</button>
+  </form>
+</dialog>
+
+<!-- Scan QR langsung: kamera + analisis bingkai terus-menerus (js/qr.js live) -->
+<dialog id="qrDialog">
+  <div class="qr-wrap">
+    <h3>Scan QR ID Pelanggan</h3>
+    <div class="qr-view idle" id="qrView">
+      <video id="qrVideo" playsinline muted></video>
+      <div class="qr-frame" id="qrFrame"><i></i></div>
+    </div>
+    <p id="qrStatus" class="muted">Mengaktifkan kamera…</p>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-ghost hidden" id="qrTorch">🔦 Senter</button>
+      <button type="button" class="btn btn-ghost" id="qrPhoto">🖼️ Ambil foto</button>
+      <button type="button" class="btn btn-ghost" id="qrCancel">Batal</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="pwDialog">
+  <form id="pwForm" method="dialog" novalidate>
+    <h3>Ganti Password</h3>
+    <label for="pwOld">Password lama</label>
+    <div class="pw">
+      <input id="pwOld" type="password" autocomplete="current-password">
+      <button type="button" class="pw-toggle" data-pw="pwOld" aria-label="Tampilkan password" aria-pressed="false">👁</button>
+    </div>
+    <label for="pwNew">Password baru (min. 6 karakter)</label>
+    <div class="pw">
+      <input id="pwNew" type="password" autocomplete="new-password">
+      <button type="button" class="pw-toggle" data-pw="pwNew" aria-label="Tampilkan password" aria-pressed="false">👁</button>
+    </div>
+    <div id="pwMsg"></div>
+    <div class="dlg-actions">
+      <button class="btn btn-ghost" id="btnPwCancel" type="button">Batal</button>
+      <button class="btn btn-primary" id="btnPwSave" type="submit">Simpan</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- TensorFlow.js 4.22.0 (vendor/, ikut cache offline) dimuat SAAT DIBUTUHKAN oleh js/cnn.js,
+     bukan saat aplikasi dibuka. Bila gagal dimuat, aplikasi tetap jalan dengan k-NN. -->
+<script>window.TFJS_SRC = 'vendor/tf.min.js';</script>
+<script src="js/ocr.js"></script>
+<script src="js/cnn.js"></script>
+<script src="js/detect.js"></script>
+<script src="js/xlsx.js"></script>
+<script src="js/qr.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
