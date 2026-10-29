@@ -579,12 +579,24 @@
   // Pembacaan terakhir per pelanggan disimpan di HP: tampil seketika & tetap ada saat offline.
   // Server tetap ditanya di latar belakang untuk memperbarui (mis. dibaca petugas lain).
   const LAST_KEY = 'lastCache.v1';
+  let lastMem = null;   // salinan di memori: localStorage cukup dibaca sekali
   const lastCache = {
-    all() { try { return JSON.parse(store.get(LAST_KEY, '{}')); } catch { return {}; } },
+    all() {
+      if (!lastMem) { try { lastMem = JSON.parse(store.get(LAST_KEY, '{}')) || {}; } catch { lastMem = {}; } }
+      return lastMem;
+    },
     get(id) { return this.all()[id] || null; },
-    set(id, v) {
-      const a = this.all();
-      if (v) a[id] = { finalReading: v.finalReading, timestamp: v.timestamp, at: Date.now() }; else delete a[id];
+    set(id, v) { this.merge([[id, v]], true); },
+    /** pairs: [[id, {finalReading, timestamp} | null]]; force=false -> tidak menimpa pembacaan lokal yang lebih baru */
+    merge(pairs, force) {
+      const a = this.all(), now = Date.now();
+      for (const [id, v] of pairs) {
+        if (!v) { if (force) delete a[id]; continue; }
+        const cur = a[id];
+        if (force || !cur || !cur.timestamp || new Date(v.timestamp) >= new Date(cur.timestamp)) {
+          a[id] = { finalReading: v.finalReading, timestamp: v.timestamp, at: now };
+        }
+      }
       const keys = Object.keys(a);
       if (keys.length > 3000) keys.sort((x, y) => a[x].at - a[y].at).slice(0, keys.length - 3000).forEach((k) => delete a[k]);
       store.set(LAST_KEY, JSON.stringify(a));
@@ -607,8 +619,56 @@
       box.classList.remove('hidden');
     } else box.classList.add('hidden');
   }
+  // ---------- Direktori pelanggan (petugas) ----------
+  // Semua pelanggan + pembacaan terakhirnya diambil SEKALI (±25 KB untuk 300 pelanggan) dan disimpan di HP:
+  // mengetik / scan ID langsung menampilkan nama & acuan tanpa menunggu server, juga saat tanpa sinyal.
+  // Diperbarui saat login, saat aplikasi dibuka lagi, dan tiap DIR_FRESH. ID yang TIDAK ada di direktori
+  // tetap ditanyakan ke server (mis. pelanggan yang baru saja didaftarkan admin).
+  const DIR_KEY = 'custDir.v1', DIR_FRESH = 15 * 60 * 1000;
+  let dir = null;   // { owner, at, rev, registry, complete, by: { id: [id, angka, waktu, nama, alamat, aktif, terdaftar] } }
+  try { dir = JSON.parse(store.get(DIR_KEY, 'null')); } catch { dir = null; }
+  let dirLoading = null;
+  const staff = () => { const u = me(); return !!u && u.role !== 'pelanggan'; };
+  function dirFor(u) { return dir && u && dir.owner === u.username && u.role !== 'pelanggan' ? dir : null; }
+  function applyDir() {
+    const d = dirFor(me());
+    if (!d) return;
+    for (const id in d.by) {
+      const it = d.by[id];
+      custInfo[id] = it[6] ? { nama: it[3], alamat: it[4], aktif: !!it[5] } : (d.registry ? null : undefined);
+    }
+    showCustomer();
+  }
+  function loadDirectory(force) {
+    if (!staff() || !serverReady() || !navigator.onLine) return Promise.resolve();
+    const u = me(), d = dirFor(u);
+    if (!force && d && Date.now() - d.at < DIR_FRESH) return Promise.resolve();
+    if (!dirLoading) {
+      dirLoading = api('directory', { rev: d ? d.rev : '' }).then((r) => {
+        const cur = me();
+        if (!cur || cur.username !== u.username) return;   // pengguna berganti saat menunggu
+        if (r.same && d) { d.at = Date.now(); }
+        else if (r.items) {
+          const by = {};
+          for (const it of r.items) by[it[0]] = it;
+          dir = { owner: u.username, at: Date.now(), rev: r.rev, registry: !!r.registry, complete: !!r.complete, by };
+          lastCache.merge(r.items.map((it) => [it[0], it[1] === null ? null : { finalReading: it[1], timestamp: it[2] }]));
+        } else return;
+        store.set(DIR_KEY, JSON.stringify(dir));
+        applyDir();
+      }).catch(() => {}).finally(() => { dirLoading = null; });
+    }
+    return dirLoading;
+  }
+  /** ID ada di direktori yang masih segar -> nama & acuan sudah pasti, tidak perlu tanya server */
+  function knownLocally(id) {
+    const d = dirFor(me());
+    if (!d || Date.now() - d.at >= DIR_FRESH || !d.by[id]) return false;
+    return d.by[id][1] !== null || d.complete;
+  }
+
   function refreshLast(id) {
-    if (!id || !serverReady() || !me() || !navigator.onLine) return Promise.resolve(lastCache.get(id));
+    if (!id || !serverReady() || !me() || !navigator.onLine || knownLocally(id)) return Promise.resolve(lastCache.get(id));
     if (!inflight[id]) {
       inflight[id] = api('last', { customerId: id })
         .then((res) => {
@@ -1129,6 +1189,16 @@
     if (user.role !== 'pelanggan') (window.requestIdleCallback || ((f) => setTimeout(f, 3000)))(() => MeterQR.preload());
     updateNetbar();
     flushOutbox();
+    applyDir();                        // nama pelanggan dari direktori tersimpan (juga saat offline)
+    loadDirectory();
   });
-  MeterAuth.on('logout', () => { resetForm(); applyRole(null); updateNetbar(); });
+  MeterAuth.on('logout', () => {
+    // data pelanggan tidak ditinggalkan di HP setelah keluar
+    dir = null; store.set(DIR_KEY, 'null');
+    for (const k in custInfo) delete custInfo[k];
+    resetForm(); applyRole(null); updateNetbar();
+  });
+  // aplikasi dibuka lagi / sinyal kembali -> perbarui direktori bila sudah lebih dari 15 menit
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadDirectory(); });
+  window.addEventListener('online', () => loadDirectory());
 })();
