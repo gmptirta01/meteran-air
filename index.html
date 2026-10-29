@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
+<!-- aplikasi internal: jangan tampilkan di mesin pencari -->
+<meta name="robots" content="noindex, nofollow">
 <title>Baca Meter Air</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -579,7 +581,7 @@
 
 <!-- TensorFlow.js 4.22.0 (vendor/, ikut cache offline) dimuat SAAT DIBUTUHKAN oleh js/cnn.js,
      bukan saat aplikasi dibuka. Bila gagal dimuat, aplikasi tetap jalan dengan k-NN. -->
-<script>window.TFJS_SRC = 'vendor/tf.min.js';</script>
+<script>window.TFJS_SRC = 'vendor/tf.min.js'; window.JSQR_SRC = 'vendor/jsQR.js';</script>
 <script src="js/ocr.js"></script>
 <script src="js/cnn.js"></script>
 <script src="js/detect.js"></script>

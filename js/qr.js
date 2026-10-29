@@ -10,13 +10,15 @@
  *
  * Pembaca:
  *   - BarcodeDetector bawaan browser (Android Chrome): tanpa unduhan, jalan offline.
- *   - jsQR 1.4.0 (Cosmo Wolfe, Apache-2.0, library kecil) — dimuat dari CDN HANYA bila browser tidak punya
+ *   - jsQR 1.4.0 (Cosmo Wolfe, Apache-2.0, vendor/jsQR.js) — dimuat HANYA bila browser tidak punya
  *     BarcodeDetector (mis. iPhone).
  */
 (function (global) {
   'use strict';
 
-  const JSQR_URL = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  // Lokal (vendor/jsQR.js, sama persis dengan npm jsqr@1.4.0) agar tidak bergantung pada CDN pihak ketiga.
+  // Build Apps Script tidak bisa menyajikan vendor/ -> memakai CDN versi tetap + cek integritas (SRI).
+  const JSQR_URL = global.JSQR_SRC || 'vendor/jsQR.js';
   let loading = null;
   function loadJsQR() {
     if (global.jsQR) return Promise.resolve(global.jsQR);
@@ -24,8 +26,9 @@
       loading = new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = JSQR_URL; s.async = true;
+        if (global.JSQR_SRI) { s.integrity = global.JSQR_SRI; s.crossOrigin = 'anonymous'; }
         s.onload = () => (global.jsQR ? resolve(global.jsQR) : reject(new Error('Pembaca QR tidak termuat')));
-        s.onerror = () => { loading = null; reject(new Error('Pembaca QR gagal dimuat (perlu internet)')); };
+        s.onerror = () => { loading = null; s.remove(); reject(new Error('Pembaca QR gagal dimuat (perlu internet)')); };
         document.head.appendChild(s);
       });
     }

@@ -1,0 +1,24 @@
+# Dibuat otomatis oleh tools/build_pages.py — jangan diedit di sini.
+# Repo GitHub Pages ini PUBLIK: hanya file aplikasi yang boleh ikut.
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+# foto / data uji (mis. foto meter pelanggan)
+*.jpg
+*.jpeg
+*.heic
+*.csv
+*.xlsx
+samples/
+# kode server & kredensial
+apps-script/
+*.gs
+.clasp.json
+.clasprc.json
+*.env
+.env*
+*.pem
+*.key
+node_modules/

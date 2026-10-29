@@ -9,9 +9,8 @@
  *
  * Setiap rilis: NAIKKAN VERSION agar cache lama dibersihkan dan HP memuat versi baru.
  */
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE = `meter-air-${VERSION}`;
-const JSQR_URL = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';   // sama dengan js/qr.js
 const SHELL = [
   './',
   'index.html',
@@ -31,6 +30,9 @@ const SHELL = [
   'icons/apple-touch-icon.png',
   'icons/favicon-32.png',
 ];
+// Disimpan saat pertama dipakai saja (tidak diunduh saat install): pembaca QR jsQR hanya untuk HP tanpa
+// BarcodeDetector (mis. iPhone); js/qr.js memuatnya di waktu luang setelah login -> scan QR tetap jalan offline.
+const LAZY = ['vendor/jsQR.js'];
 
 self.addEventListener('install', (event) => {
   // cache: 'reload' -> lewati cache HTTP browser, ambil versi terbaru dari server
@@ -52,18 +54,6 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
-  // Pembaca QR (jsQR, CDN, versi tetap) untuk HP tanpa BarcodeDetector: simpan agar scan QR jalan offline
-  if (req.method === 'GET' && url.href === JSQR_URL) {
-    event.respondWith((async () => {
-      const cache = await caches.open(CACHE);
-      const hit = await cache.match(req);
-      if (hit) return hit;
-      const res = await fetch(req);
-      if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
-      return res;
-    })());
-    return;
-  }
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;   // biarkan Apps Script dll.
 
   // Navigasi halaman: selalu kembalikan index.html dari cache bila offline
@@ -86,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req, { ignoreSearch: true });
     const network = fetch(req).then((res) => {
-      if (res.ok && SHELL.some((p) => url.pathname.endsWith(p.replace('./', '/')))) cache.put(req, res.clone());
+      if (res.ok && SHELL.concat(LAZY).some((p) => url.pathname.endsWith(p.replace('./', '/')))) cache.put(req, res.clone());
       return res;
     }).catch(() => null);
     return cached || (await network) || new Response('Offline', { status: 503 });

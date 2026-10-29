@@ -1,0 +1,18 @@
+Hak Cipta (c) 2026 GMP Tirta. Semua hak dilindungi.
+
+Aplikasi "Baca Meter Air" (kode sumber, termasuk modul OCR, deteksi angka meter, dan tampilan)
+adalah milik GMP Tirta. Kode ini dapat dilihat publik semata-mata karena disajikan sebagai aplikasi
+web melalui GitHub Pages. Tidak ada izin yang diberikan untuk menyalin, mengubah, menggabungkan,
+menerbitkan, mendistribusikan, mensublisensikan, atau menjual salinan kode ini, seluruhnya maupun
+sebagian, tanpa izin tertulis dari GMP Tirta.
+
+Copyright (c) 2026 GMP Tirta. All rights reserved.
+No permission is granted to copy, modify, merge, publish, distribute, sublicense, or sell copies
+of this software, in whole or in part, without prior written permission from GMP Tirta.
+
+-------------------------------------------------------------------------------
+Komponen pihak ketiga (tetap berlaku lisensi aslinya):
+
+- jsQR 1.4.0 (vendor/jsQR.js) — Copyright Cosmo Wolfe — Apache License 2.0
+- TensorFlow.js (vendor/tf.min.js) — Copyright Google LLC — Apache License 2.0
+Teks lengkap Apache License 2.0: vendor/LICENSE-APACHE-2.0.txt
