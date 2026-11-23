@@ -648,8 +648,15 @@
       dirLoading = api('directory', { rev: d ? d.rev : '' }).then((r) => {
         const cur = me();
         if (!cur || cur.username !== u.username) return;   // pengguna berganti saat menunggu
+        if (r.user) MeterAuth.syncUser(r.user);
         if (r.same && d) { d.at = Date.now(); }
-        else if (r.items) {
+        else if (r.delta && d) {
+          // hanya pelanggan yang berubah sejak salinan di HP (pembacaan baru dari petugas lain)
+          const by = Object.assign({}, d.by);   // objek baru -> indeks pencarian nama ikut dibangun ulang
+          mergeDir(by, r.items);
+          Object.assign(d, { at: Date.now(), rev: r.rev, by });
+          lastCache.merge(r.items.filter((it) => it[1] !== null).map((it) => [it[0], { finalReading: it[1], timestamp: it[2] }]));
+        } else if (r.items) {
           const by = {};
           for (const it of r.items) by[it[0]] = it;
           dir = { owner: u.username, at: Date.now(), rev: r.rev, registry: !!r.registry, complete: !!r.complete, by };
@@ -657,9 +664,21 @@
         } else return;
         store.set(DIR_KEY, JSON.stringify(dir));
         applyDir();
-      }).catch(() => {}).finally(() => { dirLoading = null; });
+      }).catch((err) => { if (err.forbidden) MeterAuth.checkMe(); })   // peran diubah admin -> muat ulang akun
+        .finally(() => { dirLoading = null; });
     }
     return dirLoading;
+  }
+  /** Gabungkan selisih dari server: [ID, angka, waktu] atau baris lengkap; pembacaan yang lebih baru menang */
+  function mergeDir(by, items) {
+    for (const it of items) {
+      const cur = by[it[0]];
+      const next = it.length > 3 ? it.slice() : (cur ? cur.slice() : [it[0], null, null, '', '', 1, 0]);
+      const keep = cur && cur[2] && (!it[2] || new Date(cur[2]) > new Date(it[2]));
+      next[1] = keep ? cur[1] : it[1];
+      next[2] = keep ? cur[2] : it[2];
+      by[it[0]] = next;
+    }
   }
   /** ID ada di direktori yang masih segar -> nama & acuan sudah pasti, tidak perlu tanya server */
   function knownLocally(id) {
@@ -1291,7 +1310,7 @@
     updateNetbar();
     flushOutbox();
     applyDir();                        // nama pelanggan dari direktori tersimpan (juga saat offline)
-    loadDirectory();
+    loadDirectory(true);               // selalu saat dimulai: sekaligus memeriksa sesi & akun (pengganti 'me')
   });
   MeterAuth.on('logout', () => {
     // data pelanggan tidak ditinggalkan di HP setelah keluar

@@ -9,7 +9,7 @@
  *
  * Setiap rilis: NAIKKAN VERSION agar cache lama dibersihkan dan HP memuat versi baru.
  */
-const VERSION = 'v27';
+const VERSION = 'v28';
 const CACHE = `meter-air-${VERSION}`;
 const SHELL = [
   './',

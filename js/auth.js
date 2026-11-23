@@ -501,13 +501,21 @@
   // =====================================================================
   // Mulai: sesi tersimpan -> langsung masuk (bisa offline); diperiksa ke server di latar belakang
   // =====================================================================
+  /** Data akun terbaru dari server (nama/peran diubah admin) -> perbarui tampilan */
+  function syncUser(user) {
+    if (!state || !state.token || !user || JSON.stringify(user) === JSON.stringify(state.user)) return;
+    setSession(state.token, user); applyUser(); go(currentView, true);
+  }
+  function checkMe() {
+    if (!navigator.onLine || !state || !state.token) return;
+    api('me').then((r) => syncUser(r.user)).catch(() => {});   // sesi tidak sah -> sessionLost() sudah menampilkan login
+  }
+  window.MeterAuth.syncUser = syncUser;
+  window.MeterAuth.checkMe = checkMe;
   if (state && state.token) {
     showShell();
-    if (navigator.onLine) {
-      api('me').then((r) => {
-        if (JSON.stringify(r.user) !== JSON.stringify(state.user)) { setSession(state.token, r.user); applyUser(); go(currentView, true); }
-      }).catch(() => {});   // sesi tidak sah -> sessionLost() sudah menampilkan login
-    }
+    // petugas: diperiksa lewat permintaan direktori saat aplikasi dimulai (1 panggilan server, bukan 2)
+    if (state.user.role === 'pelanggan') checkMe();
   } else {
     showLogin();
   }
