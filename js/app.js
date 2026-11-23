@@ -149,6 +149,7 @@
     if (pel) { inp.value = u.idMeter; refreshLast(u.idMeter); }
     // Pelanggan: ID terkunci ke meternya sendiri -> tidak perlu scan QR
     $('btnScanQr').classList.toggle('hidden', !!pel);
+    $('btnFindName').classList.toggle('hidden', !!pel);
     resetIdSource();
     showCustomer();
   }
@@ -703,7 +704,7 @@
   // atau otomatis dari foto meter bila stikernya ikut terfoto.
   // ID dari QR dikunci (tidak tertimpa ketikan); "Ubah manual" membukanya. Ketik manual tetap boleh.
   // =====================================================================
-  let idMethod = '';   // 'QR (foto meter)' | 'QR (scan stiker)' | 'Manual' | 'Akun pelanggan' | '' (belum diisi)
+  let idMethod = '';   // 'QR (foto meter)' | 'QR (scan stiker)' | 'Manual' | 'Cari nama' | 'Akun pelanggan' | '' (belum diisi)
   function resetIdSource() {
     const u = me(), pel = u && u.role === 'pelanggan';
     idMethod = pel ? 'Akun pelanggan' : '';
@@ -711,7 +712,7 @@
     if (!pel) $('customerId').readOnly = false;
     $('btnIdManual').classList.add('hidden');
     $('idSource').className = 'muted';
-    $('idSource').textContent = pel ? 'ID meter akun Anda.' : 'Scan stiker QR, atau ID terbaca otomatis bila stikernya ikut terfoto. Ketik manual tetap bisa.';
+    $('idSource').textContent = pel ? 'ID meter akun Anda.' : 'Scan stiker QR, cari lewat nama, atau ketik ID manual. ID juga terbaca otomatis bila stikernya ikut terfoto.';
   }
   function setIdFromQr(id, method) {
     const inp = $('customerId'), before = inp.value.trim();
@@ -834,6 +835,106 @@
       $('idSource').textContent = '⚠️ ' + (err.message || 'Gagal membaca QR') + ' — ketik ID manual.';
     }
   };
+
+  // --- Cari pelanggan lewat nama / alamat: dari direktori di HP (tanpa server, juga offline) ---
+  // Divalidasi seperti ketik manual (harus terdaftar & Aktif); Metode ID = 'Cari nama'.
+  const SAPAAN = /^(bpk|bapak|pak|ibu|bu|sdr|sdri|saudara|saudari|h|hj|haji|hajah|tn|tuan|ny|nyonya|nn|nona)$/;
+  const normText = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const nameWords = (s) => normText(s).split(' ').filter((w) => w && !SAPAAN.test(w));
+  let findIdx = null, findIdxOf = null;   // indeks kata per pelanggan, dibangun ulang bila direktori berganti
+  function findIndex(d) {
+    if (findIdxOf === d.by) return findIdx;
+    findIdx = [];
+    for (const id in d.by) {
+      const it = d.by[id];
+      if (!it[6] || !it[3] || it[3] === '(belum diisi)') continue;   // belum terdaftar / tanpa nama
+      findIdx.push({ id, nama: it[3], alamat: it[4] || '', aktif: !!it[5], nw: nameWords(it[3]), aw: normText(it[4]).split(' ').filter(Boolean), idl: id.toLowerCase() });
+    }
+    findIdxOf = d.by;
+    return findIdx;
+  }
+  /** 0 = awal kata, 1 = di tengah kata (min. 3 huruf), 9 = tidak cocok */
+  function wordHit(tok, ws) {
+    let best = 9;
+    for (const w of ws) { if (w.startsWith(tok)) return 0; if (tok.length >= 3 && w.includes(tok)) best = 1; }
+    return best;
+  }
+  const readThisMonth = (id) => {
+    const l = lastCache.get(id), now = new Date();
+    if (!l || !l.timestamp) return false;
+    const t = new Date(l.timestamp);
+    return t.getFullYear() === now.getFullYear() && t.getMonth() === now.getMonth();
+  };
+  /** Hasil: aktif dulu, lalu yang BELUM dibaca bulan ini (rute petugas), lalu kecocokan terbaik */
+  function findCustomers(q, limit) {
+    const d = dirFor(me());
+    if (!d) return null;
+    // sapaan di kueri diabaikan, kecuali kata terakhir yang masih diketik ("bu" bisa jadi "budi")
+    const raw = normText(q).split(' ').filter(Boolean);
+    const toks = raw.filter((w, i) => i === raw.length - 1 || !SAPAAN.test(w));
+    if (!toks.length) return [];
+    const out = [];
+    for (const c of findIndex(d)) {
+      let score = 0;
+      for (const tok of toks) {
+        const n = wordHit(tok, c.nw);
+        if (n < 9) { score += n; continue; }
+        const a = wordHit(tok, c.aw);
+        if (a < 9) { score += 2 + a; continue; }
+        if (tok.length >= 3 && c.idl.includes(tok)) { score += 2; continue; }
+        score = -1; break;
+      }
+      if (score < 0) continue;
+      if (c.nw[0] && c.nw[0].startsWith(toks[0])) score -= 1;   // diawali nama depan
+      out.push({ c, score, read: readThisMonth(c.id) });
+    }
+    out.sort((x, y) => (y.c.aktif - x.c.aktif) || (x.read - y.read) || (x.score - y.score) || x.c.nama.localeCompare(y.c.nama, 'id'));
+    return out.slice(0, limit);
+  }
+  function renderFind() {
+    const q = $('findQ').value, st = $('findStatus'), list = $('findList');
+    const d = dirFor(me());
+    list.innerHTML = '';
+    if (!d) { st.textContent = navigator.onLine ? '⏳ Mengunduh direktori pelanggan…' : '⚠️ Direktori pelanggan belum tersedia di HP ini. Sambungkan internet sekali, lalu coba lagi.'; return; }
+    if (normText(q).replace(/ /g, '').length < 2) { st.textContent = 'Ketik minimal 2 huruf nama atau alamat.'; return; }
+    const res = findCustomers(q, 10);
+    if (!res.length) { st.textContent = `Tidak ada pelanggan cocok dengan "${q.trim()}". Coba sebagian nama saja, atau alamatnya.`; return; }
+    st.textContent = res.length === 10 ? '10 teratas, ketik lebih lengkap untuk mempersempit.' : `${res.length} pelanggan ditemukan.`;
+    list.innerHTML = res.map(({ c, read }) => `<li><button type="button" data-id="${esc(c.id)}"${c.aktif ? '' : ' class="off"'}>` +
+      `<b>${esc(c.nama)}</b><span>${c.alamat ? esc(c.alamat) + ' · ' : ''}ID ${esc(c.id)}</span>` +
+      (c.aktif ? (read ? '<em class="done">✅ Sudah dibaca bulan ini</em>' : '<em class="todo">⏳ Belum dibaca bulan ini</em>') : '<em>⛔ Nonaktif</em>') +
+      '</button></li>').join('');
+  }
+  function setIdFromName(id) {
+    resetIdSource();
+    $('customerId').value = id;
+    idMethod = 'Cari nama';
+    $('idSource').textContent = '🔍 ID dipilih dari pencarian nama.';
+    showCustomer();
+    refreshLast(id);
+    if (!$('resultCard').classList.contains('hidden')) fetchLast();
+  }
+  $('btnFindName').onclick = () => {
+    $('findQ').value = '';
+    renderFind();
+    $('findDialog').showModal();
+    $('findQ').focus();
+    loadDirectory().then(() => { if ($('findDialog').open) renderFind(); });   // perbarui bila sudah lewat 15 menit
+  };
+  $('findQ').addEventListener('input', renderFind);
+  $('findQ').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = $('findList').querySelector('button');
+    if (first) first.click();
+  });
+  $('findList').onclick = (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (!b) return;
+    $('findDialog').close();
+    setIdFromName(b.dataset.id);
+  };
+  $('findCancel').onclick = () => $('findDialog').close();
   $('btnIdManual').onclick = () => {
     resetIdSource();
     idMethod = 'Manual';

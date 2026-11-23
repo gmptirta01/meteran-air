@@ -79,9 +79,9 @@
   .kbd-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-width: 50px; height: 36px; padding: 0 8px;
     border: 1px solid var(--stroke); border-radius: 10px; background: var(--glass-2); color: var(--ice); font: 600 13px system-ui, sans-serif; cursor: pointer; }
   .kbd-toggle:focus-visible { outline: none; box-shadow: var(--glow); }
-  .id-tools { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; }
-  .id-tools .muted { flex: 1; font-size: 12px; }
-  .id-tools .btn { flex: 0 0 auto; }
+  .id-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .id-tools #idSource { flex: 1 1 100%; font-size: 12px; }
+  .id-tools .btn { flex: 1 1 0; justify-content: center; }
   #idSource.qr { color: var(--ok); font-weight: 600; }
   #customerId.from-qr { border-color: var(--ok); box-shadow: 0 0 0 1px rgba(74, 222, 128, .45); }
   .pw input { padding-right: 52px; }
@@ -227,6 +227,20 @@
   .switch { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 14px; }
   .switch input { width: 20px; height: 20px; }
 
+  /* cari pelanggan lewat nama */
+  .find-wrap { padding: 16px; }
+  .find-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 52vh; overflow-y: auto; }
+  .find-list li + li { margin-top: 6px; }
+  .find-list button { display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+    color: var(--text); background: var(--glass-2); border: 1px solid var(--stroke); font: inherit; }
+  .find-list button:hover, .find-list button:focus-visible { outline: none; box-shadow: var(--glow); }
+  .find-list b { display: block; font-size: 15px; overflow-wrap: anywhere; }
+  .find-list span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+  .find-list em { display: inline-block; font-style: normal; font-size: 12px; margin-top: 4px; color: var(--muted); }
+  .find-list em.todo { color: #fde68a; }
+  .find-list em.done { color: var(--ok); }
+  .find-list .off { opacity: .6; }
+
   /* scan QR langsung (viewfinder) */
   .qr-wrap { padding: 16px; }
   .qr-view { position: relative; width: 100%; aspect-ratio: 3 / 4; max-height: 60vh; margin-top: 10px;
@@ -328,8 +342,9 @@
           </div>
           <!-- ID dari stiker QR (dibuat aplikasi lain, isi = ID numerik): scan stikernya, atau otomatis dari foto meter -->
           <div class="id-tools">
-            <span id="idSource" class="muted">Scan stiker QR, atau ID terbaca otomatis bila stikernya ikut terfoto. Ketik manual tetap bisa.</span>
+            <span id="idSource" class="muted">Scan stiker QR, cari lewat nama, atau ketik ID manual. ID juga terbaca otomatis bila stikernya ikut terfoto.</span>
             <button class="btn btn-ghost btn-inline" id="btnScanQr" type="button">📷 Scan QR</button>
+            <button class="btn btn-ghost btn-inline" id="btnFindName" type="button">🔍 Cari nama</button>
             <button class="btn btn-ghost btn-inline hidden" id="btnIdManual" type="button">✏️ Ubah manual</button>
           </div>
           <input id="qrFile" type="file" accept="image/*" capture="environment" class="hidden">
@@ -539,6 +554,20 @@
     </div>
     <button class="btn btn-danger btn-sm hidden" id="btnUserDelete" type="button">🗑️ Hapus Pengguna</button>
   </form>
+</dialog>
+
+<!-- Cari pelanggan lewat nama / alamat: dari direktori pelanggan di HP (juga offline) -->
+<dialog id="findDialog">
+  <div class="find-wrap">
+    <h3>Cari Pelanggan</h3>
+    <input id="findQ" type="search" placeholder="Ketik nama atau alamat, mis. siti mawar" autocomplete="off"
+      autocorrect="off" spellcheck="false" enterkeyhint="search" maxlength="60" aria-label="Nama atau alamat pelanggan">
+    <p id="findStatus" class="muted">Ketik minimal 2 huruf.</p>
+    <ul id="findList" class="find-list"></ul>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-ghost" id="findCancel">Batal</button>
+    </div>
+  </div>
 </dialog>
 
 <!-- Scan QR langsung: kamera + analisis bingkai terus-menerus (js/qr.js live) -->
